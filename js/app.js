@@ -47,7 +47,7 @@ document.addEventListener("click",async ev=>{
       try{await downloads.save(a==="rep-pdf"?{filename:r.file+".pdf",data:reportPDF(r)}:{filename:r.file+".csv",data:reportCSV(r)});toast("Informe descargado")}
       catch(e){if(!(e&&e.code==="declined"))toast(e.message||"No se pudo generar el informe")}
       t.disabled=false;break}
-    case "emisor-save":{const fd=new FormData($("#emForm"));const o={};fd.forEach((v,k)=>o[k]=String(v).trim());if(!db)throw new Error("Sin conexión");await db.doc("config/emisor").set(o);toast("Datos del emisor guardados");break}
+    case "emisor-save":{const fd=new FormData($("#emForm"));const o={};fd.forEach((v,k)=>o[k]=String(v).trim());if(!rutOk(o.rut))throw new Error("El RUT del emisor no es válido (revisa el dígito verificador).");if(!emailOk(o.email))throw new Error("El correo del emisor no parece válido.");if(!db)throw new Error("Sin conexión");await db.doc("config/emisor").set(o);toast("Datos del emisor guardados");break}
     case "demo-clear":confirmar("¿Borrar todos los registros marcados como ejemplo?",async()=>{for(const c of COLS)for(const x of S[c].filter(x=>x.ejemplo))await borrar(c,x.id)});break;
   }}catch(e){toast(e.message||"Ocurrió un error","err")}
 });

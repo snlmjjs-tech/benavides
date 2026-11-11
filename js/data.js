@@ -4,7 +4,12 @@ async function guardar(col,id,data){
   try{ if(id) await db.collection(col).doc(id).set(data); else await db.collection(col).add(data); }
   catch(e){ throw new Error(e&&e.code==="permission-denied"?"No tienes permiso para modificar estos datos.":e&&e.code==="resource-exhausted"?"Se alcanzó el límite de uso de Firebase.":"No se pudo guardar. Intenta de nuevo."); }
 }
-async function borrar(col,id){ if(!db)return; await db.collection(col).doc(id).delete(); }
+async function borrar(col,id){
+  if(!db)return;
+  const el=document.querySelector(`#main [data-id="${id}"]`),row=el&&el.closest("tr,.li");
+  if(row&&!matchMedia("(prefers-reduced-motion:reduce)").matches){row.classList.add("row-del");await new Promise(r=>setTimeout(r,230))}
+  await db.collection(col).doc(id).delete();
+}
 const PERMITIDOS=["application/pdf","image/png","image/jpeg","image/webp","image/gif"];
 async function subir(file){
   if(!assets)throw new Error("Inicia sesión para adjuntar archivos.");

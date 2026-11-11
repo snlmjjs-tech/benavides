@@ -64,10 +64,10 @@ function vencimientos(){
   vigentes().forEach(k=>{if(pagoDelPeriodo(k.id,per))return;const f=per+"-"+pad(Math.min(Number(k.diaPago)||5,28)),d=daysTo(f);if(d>=0&&d<=7)out.push({f,d,tipo:"Arriendo",t:k.arrendatario,s:`Pago esperado · ${money(k.canon,k.moneda)}`,act:"pay-new",lab:"Registrar",id:k.id})});
   return out.sort((a,b)=>a.f.localeCompare(b.f));
 }
-function actividad(n){
+function actividad(n,propId){
   const a=[];
-  S.pagos.forEach(p=>a.push({f:p.fecha,dir:"in",t:`Pago ${nro(p.numero)} · ${p.arrendatario}`,s:`${fperiod(p.periodo)} · ${propName(p.propiedadId)}`,m:clp(p.monto),act:"rec-ver",id:p.id}));
-  S.gastos.forEach(g=>a.push({f:g.fecha,dir:"out",t:g.descripcion||"Gasto de mantención",s:`${g.categoria||""} · ${propName(g.propiedadId)}${cargoPropietario(g)?"":" · cargo arrendatario"}`,m:clp(g.monto),act:"gas-ver",id:g.id}));
-  S.contribuciones.filter(q=>q.pagada&&q.fechaPago).forEach(q=>a.push({f:q.fechaPago,dir:"out",t:`Contribución cuota ${q.cuota}/${q.anio}`,s:propName(q.propiedadId),m:clp(q.monto),act:"con-edit",id:q.id}));
-  return a.filter(x=>x.f).sort((x,y)=>y.f.localeCompare(x.f)).slice(0,n);
+  S.pagos.forEach(p=>a.push({f:p.fecha,dir:"in",t:`Pago ${nro(p.numero)} · ${p.arrendatario}`,s:`${fperiod(p.periodo)} · ${propName(p.propiedadId)}`,m:clp(p.monto),act:"rec-ver",id:p.id,p:p.propiedadId}));
+  S.gastos.forEach(g=>a.push({f:g.fecha,dir:"out",t:g.descripcion||"Gasto de mantención",s:`${g.categoria||""} · ${propName(g.propiedadId)}${cargoPropietario(g)?"":" · cargo arrendatario"}`,m:clp(g.monto),act:"gas-ver",id:g.id,p:g.propiedadId}));
+  S.contribuciones.filter(q=>q.pagada&&q.fechaPago).forEach(q=>a.push({f:q.fechaPago,dir:"out",t:`Contribución cuota ${q.cuota}/${q.anio}`,s:propName(q.propiedadId),m:clp(q.monto),act:"con-edit",id:q.id,p:q.propiedadId}));
+  return a.filter(x=>x.f&&(!propId||x.p===propId)).sort((x,y)=>y.f.localeCompare(x.f)).slice(0,n);
 }

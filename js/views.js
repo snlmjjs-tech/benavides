@@ -57,6 +57,7 @@ function verPropiedad(id){
     <div><dt>Dirección</dt><dd>${esc(p.direccion)}, ${esc(p.comuna)}</dd></div><div><dt>Tipo</dt><dd>${esc(p.tipo||"—")}</dd></div>
     <div><dt>Rol SII</dt><dd class="mono">${esc(p.rol||"—")}</dd></div><div><dt>Propietario</dt><dd>${esc(p.propietario||"—")}${p.rutPropietario?`<div class="sub">${esc(p.rutPropietario)}</div>`:""}</dd></div>
     <div><dt>Avalúo fiscal</dt><dd>${p.avaluo?clp(p.avaluo):"—"}</dd></div><div><dt>Superficie</dt><dd>${p.superficie?esc(p.superficie)+" m²":"—"}</dd></div>
+    <div><dt>Construida</dt><dd>${p.supConstruida?esc(p.supConstruida)+" m²":"—"}</dd></div><div><dt>Distribución</dt><dd>${[p.dormitorios!=null&&p.dormitorios!==""?p.dormitorios+" dorm.":"",p.banos!=null&&p.banos!==""?p.banos+" baños":"",p.estacionamientos?p.estacionamientos+" estac.":"",p.anioConstruccion?"año "+p.anioConstruccion:""].filter(Boolean).map(esc).join(" · ")||"—"}</dd></div>
     <div><dt>Estado</dt><dd>${k?`<span class="pill ok">Arrendada a ${esc(k.arrendatario)}</span>`:'<span class="pill">Disponible</span>'}</dd></div>
   </dl>${p.notas?`<p class="sub" style="margin:0">${esc(p.notas)}</p>`:""}
   <div class="sec">Escrituras y documentos <button class="btn small" data-act="doc-new" data-id="${id}">Agregar</button></div>
@@ -67,6 +68,7 @@ function verPropiedad(id){
   <div class="panel">${cs.length?`<div class="list">${cs.map(q=>{const e=estadoCuota(q);return `<div class="li"><div><div class="t1">Cuota ${q.cuota}/${q.anio}</div><div class="sub">Vence ${fdate(q.vencimiento)}</div></div><div class="toolbar"><span class="mono">${clp(q.monto)}</span><span class="pill ${e.c}">${e.t}</span></div></div>`}).join("")}</div>`:emptyBox("Sin cuotas","Genera las cuatro cuotas del año a partir del monto anual.")}</div>
   <div class="sec">Gastos de mantención <button class="btn small" data-act="gas-new" data-id="${id}">Registrar gasto</button></div>
   <div class="panel">${(()=>{const gs=S.gastos.filter(g=>g.propiedadId===id).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));return gs.length?`<div class="list">${gs.slice(0,6).map(g=>`<div class="li"><div><div class="t1">${esc(g.descripcion)}</div><div class="sub">${fdate(g.fecha)} · ${esc(g.categoria)}</div></div><div class="toolbar">${cuantiaPill(g)}<span class="mono">${clp(g.monto)}</span><button class="btn small" data-act="gas-ver" data-id="${g.id}">Ver</button></div></div>`).join("")}</div>`:emptyBox("Sin gastos","Registra reparaciones y mejoras de esta propiedad.")})()}</div>
+  ${(()=>{const mv=actividad(10,id);return mv.length?`<div class="sec">Historial de movimientos</div><div class="panel"><ul class="timeline">${mv.map(m=>`<li><span class="tl-dot ${m.dir}">${ico(m.dir==="in"?"inflow":"outflow")}</span><div style="flex:1;min-width:0"><div class="t1">${esc(m.t)}</div><div class="sub">${fdate(m.f)} · ${esc(m.s)}</div></div><span class="mono" style="align-self:center">${m.dir==="in"?"+":"−"}${esc(m.m)}</span></li>`).join("")}</ul></div>`:""})()}
   ${ps.length?`<div class="sec">Últimos pagos</div><div class="panel"><div class="list">${ps.map(x=>`<div class="li"><div><div class="t1">${esc(nro(x.numero))}</div><div class="sub">${esc(fperiod(x.periodo))}</div></div><div class="toolbar"><span class="mono">${clp(x.monto)}</span><button class="btn small" data-act="rec-ver" data-id="${x.id}">Recibo</button></div></div>`).join("")}</div></div>`:""}`;
   openModal(p.nombre||"Propiedad",body,`<button class="btn danger" data-act="prop-del" data-id="${id}">Eliminar</button><span style="flex:1"></span><button class="btn" data-act="close">Cerrar</button><button class="btn primary" data-act="prop-edit" data-id="${id}">Editar ficha</button>`,true);
 }
@@ -85,7 +87,12 @@ function vContribuciones(){
 
 function vDocumentos(){
   const rows=fil(S.documentos).sort((a,b)=>propName(a.propiedadId).localeCompare(propName(b.propiedadId))||(b.fecha||"").localeCompare(a.fecha||""));
-  return head("Escrituras y documentos","Copia digital de escrituras, inscripciones y certificados, con sus datos de notaría y CBR.",`${propFilter()}<button class="btn primary" data-act="doc-new">Ingresar documento</button>`)+
+  const REQ=["Escritura de compraventa","Inscripción de dominio (CBR)","Certificado de dominio vigente","Certificado de avalúo fiscal"];
+  const props=(F.prop?S.propiedades.filter(p=>p.id===F.prop):S.propiedades).slice().sort((x,y)=>(x.nombre||"").localeCompare(y.nombre||""));
+  const celda=(p,t)=>{const d=S.documentos.filter(x=>x.propiedadId===p.id&&x.tipo===t);return d.some(x=>x.archivoId)?`<span class="pill ok mini" title="Registrado con archivo">Completo</span>`:d.length?`<span class="pill warn mini" title="Registrado, falta adjuntar el archivo">Sin archivo</span>`:`<span class="pill bad mini" title="No registrado">Falta</span>`};
+  const faltan=props.reduce((n,p)=>n+REQ.filter(t=>!S.documentos.some(x=>x.propiedadId===p.id&&x.tipo===t&&x.archivoId)).length,0);
+  const matriz=props.length?`<section class="panel"><header><h2>Documentos requeridos por propiedad</h2><span class="sub">${faltan?`<b class="neg">${faltan} pendiente${faltan>1?"s":""}</b> de registrar o adjuntar`:'<b class="pos">Todo completo</b>'}</span></header><div class="tw"><table><thead><tr><th>Propiedad</th>${REQ.map(t=>`<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${props.map(p=>`<tr><td class="t1">${esc(p.nombre||p.direccion)}</td>${REQ.map(t=>`<td>${celda(p,t)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></section>`:"";
+  return head("Escrituras y documentos","Copia digital de escrituras, inscripciones y certificados, con sus datos de notaría y CBR.",`${propFilter()}<button class="btn primary" data-act="doc-new">${ico("plus")}Ingresar documento</button>`)+matriz+
   `<section class="panel">${rows.length?`<div class="tw"><table><thead><tr><th>Documento</th><th>Propiedad</th><th>Fecha</th><th>Notaría / repertorio</th><th>Inscripción CBR</th><th>Archivo</th><th></th></tr></thead><tbody>${rows.map(d=>`<tr><td class="t1">${esc(d.tipo)}${exTag(d)}</td><td>${esc(propName(d.propiedadId))}</td><td>${fdate(d.fecha)}</td><td>${esc(d.notaria||"—")}${d.repertorio?`<div class="sub">Rep. ${esc(d.repertorio)}</div>`:""}</td><td class="sub">${d.fojas||d.numero?`fs. ${esc(d.fojas||"—")} N° ${esc(d.numero||"—")} año ${esc(d.anioInsc||"—")}`:"—"}${d.conservador?`<div>${esc(d.conservador)}</div>`:""}</td><td>${fileLink(d)}</td><td class="act"><button class="btn small ghost" data-act="doc-edit" data-id="${d.id}">Editar</button><button class="btn small ghost danger" data-act="doc-del" data-id="${d.id}">Eliminar</button></td></tr>`).join("")}</tbody></table></div>`:emptyBox("Sin documentos","Sube la escritura en PDF o como imagen y registra notaría, repertorio y fojas.",S.propiedades.length?`<button class="btn primary" data-act="doc-new">Ingresar documento</button>`:"")}</section>`;
 }
 function vContratos(){
@@ -143,6 +150,7 @@ function formGasto(g,preset){
    <div class="fld"><label for="g_cat">Tipo de gasto *</label>${selHTML("g_cat",v.cuantia==="mayor"?CAT_MAYOR:CAT_MENOR,v.categoria)}</div>
    <div class="fld"><label for="g_cargo">Cargo a</label>${selHTML("g_cargo",["Propietario","Arrendatario"],v.cargo||"Propietario")}<span class="hint">Lo que paga el arrendatario no se descuenta de los ingresos.</span></div>
    <div class="fld full"><label for="g_desc">Descripción del trabajo *</label><input id="g_desc" value="${esc(v.descripcion)}" placeholder="Reparación de filtración en baño principal"></div>
+   <div class="fld"><label for="g_resp">Responsable del gasto</label><input id="g_resp" value="${esc(v.responsable)}" placeholder="Quién autorizó o pagó"></div>
    <div class="fld"><label for="g_prov">Proveedor o maestro</label><input id="g_prov" value="${esc(v.proveedor)}"></div>
    <div class="fld"><label for="g_rutp">RUT proveedor</label><input id="g_rutp" value="${esc(v.rutProveedor)}" placeholder="12.345.678-9"></div>
    <div class="fld"><label for="g_tdoc">Documento</label>${selHTML("g_tdoc",["Boleta","Factura","Boleta de honorarios","Recibo simple","Sin documento"],v.tipoDoc)}</div>
@@ -168,7 +176,7 @@ function formGasto(g,preset){
     const b=$("#saveBtn");b.disabled=true;b.textContent="Guardando…";
     try{
       const f=$("#g_file").files[0],up=f?await subir(f):{};
-      const data={...strip(g||{}),propiedadId:val("g_prop"),fecha:val("g_fecha"),cuantia:document.querySelector('input[name="g_cuantia"]:checked').value,categoria:val("g_cat"),cargo:val("g_cargo"),descripcion:val("g_desc"),proveedor:val("g_prov"),rutProveedor:val("g_rutp"),tipoDoc:val("g_tdoc"),nDoc:val("g_ndoc"),medio:val("g_medio"),items:its,monto:Math.round(monto),notas:val("g_notas"),...up};
+      const data={...strip(g||{}),propiedadId:val("g_prop"),fecha:val("g_fecha"),cuantia:document.querySelector('input[name="g_cuantia"]:checked').value,categoria:val("g_cat"),cargo:val("g_cargo"),descripcion:val("g_desc"),proveedor:val("g_prov"),responsable:val("g_resp"),rutProveedor:val("g_rutp"),tipoDoc:val("g_tdoc"),nDoc:val("g_ndoc"),medio:val("g_medio"),items:its,monto:Math.round(monto),notas:val("g_notas"),...up};
       await guardar("gastos",g&&g.id,data);closeModal();toast(g?"Gasto actualizado":"Gasto registrado · "+clp(monto));
     }catch(e){fail(e.message||"No se pudo guardar.");b.disabled=false;b.textContent="Guardar gasto";}
   };
@@ -181,7 +189,7 @@ function verGasto(id){
     <div><dt>Cuantía</dt><dd>${cuantiaPill(g)}</dd></div><div><dt>Tipo</dt><dd>${esc(g.categoria)}</dd></div>
     <div><dt>Proveedor</dt><dd>${esc(g.proveedor||"—")}${g.rutProveedor?`<div class="sub">${esc(g.rutProveedor)}</div>`:""}</dd></div>
     <div><dt>Documento</dt><dd>${esc([g.tipoDoc,g.nDoc].filter(Boolean).join(" N° ")||"—")}</dd></div>
-    <div><dt>Cargo a</dt><dd>${esc(g.cargo||"Propietario")}</dd></div><div><dt>Comprobante</dt><dd>${fileLink(g)}</dd></div>
+    <div><dt>Cargo a</dt><dd>${esc(g.cargo||"Propietario")}</dd></div><div><dt>Responsable</dt><dd>${esc(g.responsable||"—")}</dd></div><div><dt>Medio de pago</dt><dd>${esc(g.medio||"—")}</dd></div><div><dt>Comprobante</dt><dd>${fileLink(g)}</dd></div>
   </dl><p style="margin:0" class="t1">${esc(g.descripcion)}</p>
   <div class="panel"><div class="tw"><table><thead><tr><th>Ítem</th><th>Clase</th><th class="num">Cant.</th><th class="num">Valor unit.</th><th class="num">Subtotal</th></tr></thead><tbody>${its.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.clase)}</td><td class="num">${esc(i.cant)}</td><td class="num">${clp(i.unit)}</td><td class="num">${clp(i.cant*i.unit)}</td></tr>`).join("")}</tbody><tfoot><tr><td colspan="4" class="t1" style="padding:10px 14px">Total</td><td class="num t1" style="padding:10px 14px">${clp(g.monto)}</td></tr></tfoot></table></div></div>
   ${g.notas?`<p class="sub" style="margin:0">${esc(g.notas)}</p>`:""}`;
@@ -299,11 +307,11 @@ function reportPDF(r){
   const doc=new J({orientation:"landscape",unit:"mm",format:"letter"});
   if(typeof doc.autoTable!=="function")throw new Error("No se pudo cargar el generador de tablas PDF.");
   const W=doc.internal.pageSize.getWidth(),A=[15,30,61],G=[184,144,58],e=S.emisor||{};
-  try{doc.addImage(LOGO,"PNG",14,10,20,20)}catch(_){}
-  doc.setFont("times","bold");doc.setFontSize(17);doc.setTextColor(...A);doc.text(r.title,38,18);
-  doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(94,101,119);doc.text(r.subtitle,38,24);
-  doc.text([e.nombre||"","Emitido "+fdate(todayISO())].filter(Boolean),W-14,17,{align:"right"});
-  doc.setDrawColor(...G);doc.setLineWidth(.5);doc.line(14,33,W-14,33);
+  doc.setFillColor(16,29,58);doc.rect(0,0,W,31,"F");doc.setFillColor(200,164,93);doc.rect(0,31,W,.9,"F");
+  try{doc.addImage(LOGO,"PNG",14,5,21,21)}catch(_){}
+  doc.setFont("times","bold");doc.setFontSize(18);doc.setTextColor(232,214,165);doc.text(r.title,40,14.5);
+  doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(190,198,216);doc.text(r.subtitle,40,21);
+  doc.text([e.nombre||"Familia Benavides",[e.rut&&"RUT "+e.rut,"Emitido "+fdate(todayISO())].filter(Boolean).join(" · ")],W-14,13,{align:"right"});
   let x=14;doc.setFontSize(8);r.kpis.forEach(([l,v])=>{doc.setTextColor(94,101,119);doc.text(l.toUpperCase(),x,40);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.setTextColor(...A);doc.text(String(v),x,46);doc.setFont("helvetica","normal");doc.setFontSize(8);x+=(W-28)/r.kpis.length});
   let y=56;
   if(!r.sections.length){doc.setFontSize(11);doc.setTextColor(94,101,119);doc.text(r.empty,14,y)}
@@ -326,14 +334,14 @@ function reportCSV(r){
   r.sections.forEach(s=>{L.push([s.h]);L.push(s.head);s.rows.forEach(x=>L.push(x));if(s.foot)L.push(s.foot);L.push([])});
   return "﻿"+L.map(r=>r.map(q).join(";")).join("\r\n");
 }
-const REPS=[["gastos","Gastos por tipo",repGastos],["impagos","Arriendos impagos",repImpagos],["anual","Ingresos vs egresos",repAnual]];
+const REPS=[["gastos","Gastos por tipo",repGastos],["anual","Ingresos vs egresos",repAnual],["rentab","Rentabilidad",repRentabilidad],["impagos","Arriendos impagos",repImpagos],["pagos","Historial de pagos",repPagosHist],["mant","Mantenciones anuales",repMantAnual],["contr","Contribuciones",repContribuciones]];
 const curReport=()=>(REPS.find(x=>x[0]===F.rep)||REPS[0])[2]();
 function vInformes(){
   const r=curReport();
   const filtros=F.rep==="impagos"
     ?`${propFilter()}<label class="flab" for="fMes">Mes</label><input class="f" type="month" id="fMes" value="${esc(F.mes)}"><label class="flab" for="fDesde">Deuda desde</label><input class="f" type="month" id="fDesde" value="${esc(F.desde)}">`
-    :`${propFilter()}${anioSel()}${F.rep==="anual"?`<label class="flab chk"><input type="checkbox" id="fContr"${F.incContr?" checked":""}> Incluir contribuciones</label>`:""}`;
-  return head("Informes","Informes listos para descargar en PDF o CSV.",`<button class="btn" data-act="rep-csv"${downloads?"":" disabled"}>Descargar CSV</button><button class="btn primary" data-act="rep-pdf"${downloads?"":" disabled"}>Descargar PDF</button>`)+
+    :`${propFilter()}${F.rep==="mant"?"":anioSel()}${F.rep==="anual"?`<label class="flab chk"><input type="checkbox" id="fContr"${F.incContr?" checked":""}> Incluir contribuciones</label>`:""}`;
+  return head("Informes","Informes financieros con filtros por año, mes y propiedad. Descarga en PDF o en Excel (CSV).",`<button class="btn" data-act="rep-csv"${downloads?"":" disabled"}>Excel / CSV</button><button class="btn primary" data-act="rep-pdf"${downloads?"":" disabled"}>Descargar PDF</button>`)+
   `<div class="tabs" role="tablist">${REPS.map(([k,l])=>`<button role="tab" data-act="rep-tab" data-id="${k}" aria-selected="${F.rep===k}">${l}</button>`).join("")}</div>
   <div class="toolbar">${filtros}</div>${reportHTML(r)}`;
 }
