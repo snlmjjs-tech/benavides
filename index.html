@@ -5,7 +5,7 @@
 <style>
 /* Layout: registro de oficina — barra lateral de libros (secciones), área de trabajo con tablas tipo libro de registro y fichas modales */
 :root{
-  --paper:#E9E2D0; --surface:#F7F2E4; --sunk:#DFD7C2; --ink:#121D35; --muted:#5A6073; --line:#D3C9AE;
+  --paper:#FBF7EA; --surface:#FFFDF6; --sunk:#F3EEDD; --ink:#121D35; --muted:#5A6073; --line:#E6DEC7;
   --accent:#0F1E3D; --accent-ink:#F3E2B0; --accent-soft:#E6E9F1; --gold:#B8903A; --gold-soft:#F4EAD2; --side:#0F1E3D; --side-ink:#E9EAF0; --side-muted:#9DA6BE; --gold-ink:#7A5A16; --c-in:#0F1E3D; --c-out:#C08A2E;
   --ok:#2C7A4C; --ok-soft:#E3F1E8; --warn:#9A6210; --warn-soft:#F7EDDB; --bad:#AE3A2E; --bad-soft:#F6E3E0;
   --shadow:0 10px 40px rgba(20,30,35,.18);
@@ -13,16 +13,7 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --paper:#0C1426; --surface:#131D33; --sunk:#0F182C; --ink:#ECE9E1; --muted:#9AA3B8; --line:#25314B;
-  --accent:#D6B061; --accent-ink:#0C1426; --accent-soft:#2A2A22; --gold:#D6B061; --gold-soft:#2C2818; --side:#080F1F; --side-ink:#ECE9E1; --side-muted:#8E97AD; --gold-ink:#E3C47E; --c-in:#8FA8D8; --c-out:#D6B061;
-  --ok:#6CC28F; --ok-soft:#18301F; --warn:#E2AA4E; --warn-soft:#33270F; --bad:#E77B6F; --bad-soft:#3A1E1A;
-  --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}}
-:root[data-theme="dark"]{
-  --paper:#0C1426; --surface:#131D33; --sunk:#0F182C; --ink:#ECE9E1; --muted:#9AA3B8; --line:#25314B;
-  --accent:#D6B061; --accent-ink:#0C1426; --accent-soft:#2A2A22; --gold:#D6B061; --gold-soft:#2C2818; --side:#080F1F; --side-ink:#ECE9E1; --side-muted:#8E97AD; --gold-ink:#E3C47E; --c-in:#8FA8D8; --c-out:#D6B061;
-  --ok:#6CC28F; --ok-soft:#18301F; --warn:#E2AA4E; --warn-soft:#33270F; --bad:#E77B6F; --bad-soft:#3A1E1A;
-  --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}
+html{color-scheme:light}
 
 *{box-sizing:border-box}
 html,body{height:100%}
