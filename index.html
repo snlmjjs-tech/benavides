@@ -19,7 +19,19 @@
     <nav id="nav"></nav>
     <div class="aside-foot" id="foot">Los datos se guardan en Firebase.</div>
   </aside>
-  <main id="main"><div class="empty"><b>Cargando la cartera…</b></div></main>
+  <div class="content">
+    <header class="topbar">
+      <button class="btn ghost menu-btn" id="menuBtn" aria-label="Abrir menú" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="crumbs" id="crumbs"></div>
+      <div class="gsearch" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="gSearch" type="search" placeholder="Buscar propiedad, arrendatario, recibo, gasto…" autocomplete="off" aria-label="Búsqueda global"><kbd>/</kbd>
+        <div class="gres" id="gRes" hidden></div>
+      </div>
+      <div class="userbox" id="userBox"></div>
+    </header>
+    <main id="main"><div class="sk-row"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div><div class="sk sk-panel"></div></main>
+  </div>
 </div>
 <div id="modalRoot"></div>
 <div id="toastRoot"></div>
@@ -31,12 +43,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="js/logo.js"></script>
+<script src="js/icons.js"></script>
 <script src="js/core.js"></script>
 <script src="js/finance.js"></script>
 <script src="js/data.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/pdf.js"></script>
 <script src="js/views.js"></script>
+<script src="js/shell.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

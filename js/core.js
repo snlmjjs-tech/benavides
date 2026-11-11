@@ -33,7 +33,13 @@ const byId=(col,id)=>S[col].find(x=>x.id===id);
 const propName=id=>{const p=byId("propiedades",id);return p?(p.nombre||p.direccion):"(propiedad eliminada)"};
 const exTag=o=>o&&o.ejemplo?'<span class="ex">ejemplo</span>':"";
 const fileLink=o=>o&&(o.archivoUrl||o.archivoId)?`<a class="filelink" href="${esc(o.archivoUrl||"/_blob/"+o.archivoId)}" target="_blank" rel="noopener">${esc(o.archivoNombre||"Ver archivo")}</a>`:'<span class="sub">Sin archivo</span>';
-function toast(msg){const r=$("#toastRoot");r.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toast.t);toast.t=setTimeout(()=>r.innerHTML="",2600)}
+function toast(msg,type){
+  const r=$("#toastRoot"),el=document.createElement("div");
+  el.className="toast"+(type==="err"?" err":"");el.setAttribute("role",type==="err"?"alert":"status");el.textContent=msg;
+  while(r.children.length>=3)r.firstChild.remove();
+  r.appendChild(el);
+  setTimeout(()=>{el.classList.add("out");setTimeout(()=>el.remove(),220)},type==="err"?4200:2600);
+}
 
 function numLetras(n){
   n=Math.floor(Math.abs(Number(n)||0)); if(n===0)return "cero";
@@ -51,3 +57,13 @@ function numLetras(n){
   return s;
 }
 
+
+/* RUT chileno: módulo 11. Vacío es válido (campo opcional). */
+function rutOk(r){
+  r=String(r||"").replace(/[.\s]/g,"").toUpperCase();if(!r)return true;
+  const m=r.match(/^(\d{1,8})-?([\dK])$/);if(!m)return false;
+  let s=0,f=2;for(let i=m[1].length-1;i>=0;i--){s+=Number(m[1][i])*f;f=f===7?2:f+1}
+  const d=11-(s%11),dv=d===11?"0":d===10?"K":String(d);return dv===m[2];
+}
+const emailOk=e=>!e||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const addDays=(iso,n)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+n);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};

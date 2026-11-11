@@ -1,46 +1,45 @@
 /* ---------- vistas ---------- */
-function nav(){
-  const cnt={propiedades:S.propiedades.length,contribuciones:S.contribuciones.filter(q=>!q.pagada).length,documentos:S.documentos.length,contratos:vigentes().length,pagos:S.pagos.length,gastos:S.gastos.filter(g=>(g.fecha||"").slice(0,4)===String(new Date().getFullYear())).length};
-  $("#nav").innerHTML=VIEWS.map(([k,l])=>`<button data-act="nav" data-id="${k}"${view===k?' aria-current="page"':""}><span>${l}</span>${cnt[k]!=null?`<span class="count">${cnt[k]}</span>`:""}</button>`).join("");
-}
 const head=(t,p,tools)=>`<div class="head"><div><h1>${t}</h1>${p?`<p>${p}</p>`:""}</div><div class="toolbar">${tools||""}</div></div>`;
 const propFilter=()=>`<select class="f" id="fProp" aria-label="Filtrar por propiedad">${propOptions("Todas las propiedades").map(([v,l])=>`<option value="${esc(v)}"${F.prop===v?" selected":""}>${esc(l)}</option>`).join("")}</select>`;
-const emptyBox=(t,s,btn)=>`<div class="empty"><b>${t}</b><span>${s}</span>${btn||""}</div>`;
+const emptyBox=(t,s,btn,icon)=>`<div class="empty">${ico(icon||"box")}<b>${t}</b><span>${s}</span>${btn||""}</div>`;
 const fil=arr=>F.prop?arr.filter(x=>x.propiedadId===F.prop):arr;
 
 function vResumen(){
-  const per=curPeriod(), vig=vigentes();
-  const estados=vig.map(k=>({k,e:estadoArriendo(k,per)}));
-  const cobrados=estados.filter(x=>x.e.p);
-  const recaudado=cobrados.reduce((s,x)=>s+(Number(x.e.p.monto)||0),0);
-  const mensualCLP=vig.filter(k=>k.moneda!=="UF").reduce((s,k)=>s+(Number(k.canon)||0),0);
-  const mensualUF=vig.filter(k=>k.moneda==="UF").reduce((s,k)=>s+(Number(k.canon)||0),0);
-  const arrendadas=S.propiedades.filter(p=>contratoDe(p.id)).length;
-  const pend=S.contribuciones.filter(q=>!q.pagada).sort((a,b)=>(a.vencimiento||"").localeCompare(b.vencimiento||""));
-  const vencidas=pend.filter(q=>q.vencimiento&&daysTo(q.vencimiento)<0);
-  const proxima=pend.find(q=>q.vencimiento&&daysTo(q.vencimiento)>=0);
-  const porVencer=S.contratos.filter(k=>{const e=estadoContrato(k);return e.vig&&k.termino&&daysTo(k.termino)<=60});
-  const pct=vig.length?Math.round(cobrados.length/vig.length*100):0;
+  const per=curPeriod(),cb=cobranza(per),y=String(new Date().getFullYear());
+  const nProp=S.propiedades.length,arrendadas=S.propiedades.filter(p=>contratoDe(p.id)).length,ocup=nProp?Math.round(arrendadas/nProp*100):0;
+  const pend=S.contribuciones.filter(q=>!q.pagada),vencidas=pend.filter(q=>q.vencimiento&&daysTo(q.vencimiento)<0);
+  const fm=flujoMes(per),ba=balanceAnio(y),gAnio=S.gastos.filter(g=>(g.fecha||"").startsWith(y));
+  const ufTxt=(o)=>o.uf?" + "+uf(o.uf):"";
+  const pct=cb.contratado.n?Math.round(cb.pagados.length/cb.contratado.n*100):0;
+  const venc=vencimientos(),act=actividad(8),serie=serieMeses(per,12),haySerie=serie.some(d=>d.I||d.E);
   const hayEj=COLS.some(c=>S[c].some(x=>x.ejemplo));
-  return head("Resumen",`${fperiod(per).replace(/^./,c=>c.toUpperCase())} · ${S.propiedades.length} propiedades en cartera`,`<button class="btn" data-act="gas-new">Registrar gasto de mantención</button><button class="btn primary" data-act="pay-new">Registrar pago</button>`)+
-  (hayEj?`<div class="banner">La cartera contiene registros de ejemplo. Agrega tus propiedades y bórralos desde «Datos del emisor».</div>`:"")+
-  `<div class="kpis">
-    <div class="kpi"><span class="l">Propiedades</span><span class="v">${S.propiedades.length}</span><span class="s">${arrendadas} arrendadas · ${S.propiedades.length-arrendadas} disponibles</span></div>
-    <div class="kpi"><span class="l">Renta mensual contratada</span><span class="v">${clp(mensualCLP)}</span><span class="s">${mensualUF?"+ "+uf(mensualUF)+" · ":""}${vig.length} contratos vigentes</span></div>
-    <div class="kpi"><span class="l">Arriendos cobrados del mes</span><span class="v">${cobrados.length} de ${vig.length}</span><div class="bar"><i style="width:${pct}%"></i></div><span class="s">${clp(recaudado)} recaudado</span></div>
-    <div class="kpi"><span class="l">Contribuciones pendientes</span><span class="v">${clp(pend.reduce((s,q)=>s+(Number(q.monto)||0),0))}</span><span class="s">${vencidas.length?`<span class="pill bad">${vencidas.length} vencida${vencidas.length>1?"s":""}</span> `:""}${proxima?"Próxima: "+fdate(proxima.vencimiento):"Sin vencimientos próximos"}</span></div>
-    ${(()=>{const y=String(new Date().getFullYear()),a=S.gastos.filter(g=>(g.fecha||"").startsWith(y));return `<div class="kpi"><span class="l">Mantención ${y}</span><span class="v">${clp(gTot(a))}</span><span class="s">Menor ${clp(gTot(a.filter(g=>!esMayor(g))))} · Mayor ${clp(gTot(a.filter(esMayor)))}</span></div>`})()}
+  const tot3=cb.pagados.length+cb.atrasados.length+cb.pendientes.length||1;
+  const sg=n=>n<0?"neg":"pos";
+  return head("Resumen",`${fperiod(per).replace(/^./,c=>c.toUpperCase())} · ${nProp} ${nProp===1?"propiedad":"propiedades"} en cartera`,`<button class="btn" data-act="gas-new">${ico("gastos")}Registrar gasto</button><button class="btn primary" data-act="pay-new">${ico("plus")}Registrar pago</button>`)+
+  (hayEj?`<div class="banner">La cartera contiene registros de ejemplo. Bórralos desde «Datos del emisor».</div>`:"")+
+  `<div class="kpis k6">
+    <div class="kpi k-info"><span class="l">Propiedades</span><span class="v">${nProp}</span><div class="bar"><i style="width:${ocup}%"></i></div><span class="s">${arrendadas} arrendadas · ${nProp-arrendadas} disponibles · ${ocup}% ocupación</span></div>
+    <div class="kpi"><span class="l">Ingreso contratado del mes</span><span class="v">${clp(cb.contratado.clp)}</span><span class="s">${ufTxt(cb.contratado).replace(/^ \+ /,"+ ")}${cb.contratado.uf?" · ":""}${cb.contratado.n} contratos vigentes</span></div>
+    <div class="kpi k-ok"><span class="l">Cobrado del mes</span><span class="v">${clp(cb.cobradoClp)}</span><div class="bar ok"><i style="width:${pct}%"></i></div><span class="s">${cb.pagados.length} de ${cb.contratado.n} arriendos · ${pct}%</span></div>
+    <div class="kpi ${cb.atrasados.length?"k-bad":"k-warn"}"><span class="l">Pendiente de cobro</span><span class="v">${(cb.pendiente.clp+cb.atrasado.clp)===0&&(cb.pendiente.uf+cb.atrasado.uf)>0?uf(cb.pendiente.uf+cb.atrasado.uf):clp(cb.pendiente.clp+cb.atrasado.clp)}</span><span class="s">${cb.atrasados.length?`<span class="pill bad mini">${cb.atrasados.length} atrasado${cb.atrasados.length>1?"s":""}</span> `:""}${cb.pendientes.length} por vencer${(cb.pendiente.clp+cb.atrasado.clp)>0&&(cb.pendiente.uf+cb.atrasado.uf)?" · + "+uf(cb.pendiente.uf+cb.atrasado.uf):""}</span></div>
+    <div class="kpi ${fm.neto<0?"k-bad":"k-ok"}"><span class="l">Flujo de caja del mes</span><span class="v ${sg(fm.neto)}">${clp(fm.neto)}</span><span class="s">Ingresos ${clp(fm.I)} · egresos ${clp(fm.E)}</span></div>
+    <div class="kpi"><span class="l">Contribuciones pendientes</span><span class="v">${clp(sum(pend,"monto"))}</span><span class="s">${vencidas.length?`<span class="pill bad mini">${vencidas.length} vencida${vencidas.length>1?"s":""}</span> `:""}${pend.length?pend.length+" cuota"+(pend.length>1?"s":""):"Al día"}</span></div>
+  </div>
+  <div class="cols wide">
+    <section class="panel"><header><h2>Ingresos y egresos · últimos 12 meses</h2><span class="sub">Balance ${y}: <b class="${sg(ba.neto)}">${clp(ba.neto)}</b></span></header>
+    ${haySerie?`<div class="chart">${chartSVG(serie)}</div><div class="pbody sub" style="padding-top:0">Egresos = mantención a cargo del propietario + contribuciones pagadas. Mantención ${y}: ${clp(gTot(gAnio))} (${clp(ba.gastosArrendatario)} a cargo de arrendatarios, no descontado).</div>`:emptyBox("Aún no hay movimientos","El gráfico aparece cuando registres pagos, gastos o contribuciones pagadas.",`<button class="btn primary" data-act="pay-new">Registrar pago</button>`,"informes")}
+    </section>
+    <section class="panel"><header><h2>Cobranza de ${fperiod(per)}</h2></header>
+    ${cb.rows.length?`<div class="pbody"><div class="stack" role="img" aria-label="Cobrado ${cb.pagados.length}, pendiente ${cb.pendientes.length}, atrasado ${cb.atrasados.length}"><i style="width:${cb.pagados.length/tot3*100}%;background:var(--ok)"></i><i style="width:${cb.pendientes.length/tot3*100}%;background:#D4A02A"></i><i style="width:${cb.atrasados.length/tot3*100}%;background:var(--bad)"></i></div><div class="sub">Pagados ${cb.pagados.length} · pendientes ${cb.pendientes.length} · atrasados ${cb.atrasados.length}</div></div>
+    <div class="list">${cb.rows.slice().sort((a,b)=>({bad:0,warn:1,ok:2}[a.e.c]-{bad:0,warn:1,ok:2}[b.e.c])).map(({k,e})=>`<div class="li"><div><div class="t1">${esc(k.arrendatario)}${exTag(k)}</div><div class="sub">${esc(propName(k.propiedadId))} · ${money(k.canon,k.moneda)} · día ${esc(k.diaPago||5)}</div></div><div class="toolbar"><span class="pill ${e.c}">${e.t}</span>${e.p?`<button class="btn small" data-act="rec-ver" data-id="${e.p.id}">Recibo</button>`:`<button class="btn small" data-act="pay-new" data-id="${k.id}">Registrar</button>`}</div></div>`).join("")}</div>`:emptyBox("Sin contratos vigentes","Registra un contrato para controlar sus pagos mensuales.",`<button class="btn" data-act="nav" data-id="contratos">Ir a contratos</button>`,"contratos")}
+    </section>
   </div>
   <div class="cols">
-    <section class="panel"><header><h2>Arriendos de ${fperiod(per)}</h2></header>
-    ${estados.length?`<div class="list">${estados.sort((a,b)=>({bad:0,warn:1,ok:2}[a.e.c]-{bad:0,warn:1,ok:2}[b.e.c])).map(({k,e})=>`<div class="li"><div><div class="t1">${esc(k.arrendatario)}${exTag(k)}</div><div class="sub">${esc(propName(k.propiedadId))} · ${money(k.canon,k.moneda)} · día ${esc(k.diaPago||5)}</div></div><div class="toolbar"><span class="pill ${e.c}">${e.t}</span>${e.p?`<button class="btn small" data-act="rec-ver" data-id="${e.p.id}">Recibo</button>`:`<button class="btn small" data-act="pay-new" data-id="${k.id}">Registrar</button>`}</div></div>`).join("")}</div>`:emptyBox("Sin contratos vigentes","Registra un contrato para controlar sus pagos mensuales.",`<button class="btn" data-act="nav" data-id="contratos">Ir a contratos</button>`)}
+    <section class="panel"><header><h2>Próximos vencimientos</h2><button class="btn small ghost" data-act="nav" data-id="contribuciones">Contribuciones ${ico("chevron")}</button></header>
+    ${venc.length?`<div class="list">${venc.slice(0,8).map(v=>`<div class="li"><div><div class="t1">${esc(v.t)}</div><div class="sub">${esc(v.tipo)} · ${esc(v.s)} · ${fdate(v.f)}</div></div><div class="toolbar"><span class="pill ${v.d<0?"bad":v.d<=30?"warn":""}">${v.d<0?"Vencido hace "+(-v.d)+" d":v.d===0?"Hoy":"En "+v.d+" d"}</span><button class="btn small" data-act="${v.act}" data-id="${v.id}">${v.lab}</button></div></div>`).join("")}</div>`:emptyBox("Todo al día","No hay contribuciones, contratos ni cobros por vencer.","","contribuciones")}
     </section>
-    <section class="panel"><header><h2>Próximas contribuciones</h2><button class="btn small ghost" data-act="nav" data-id="contribuciones">Ver todas</button></header>
-    ${pend.length?`<div class="list">${pend.slice(0,6).map(q=>{const e=estadoCuota(q);return `<div class="li"><div><div class="t1">${esc(propName(q.propiedadId))}${exTag(q)}</div><div class="sub">Cuota ${esc(q.cuota)}/${esc(q.anio)} · vence ${fdate(q.vencimiento)}</div></div><div class="toolbar"><span class="mono">${clp(q.monto)}</span><span class="pill ${e.c}">${e.t}</span><button class="btn small" data-act="con-pay" data-id="${q.id}">Marcar pagada</button></div></div>`}).join("")}</div>`:emptyBox("Contribuciones al día","No hay cuotas pendientes registradas.")}
-    </section>
-    ${porVencer.length?`<section class="panel"><header><h2>Contratos por vencer</h2></header><div class="list">${porVencer.map(k=>`<div class="li"><div><div class="t1">${esc(k.arrendatario)}</div><div class="sub">${esc(propName(k.propiedadId))} · termina ${fdate(k.termino)}</div></div><span class="pill warn">${daysTo(k.termino)} días</span></div>`).join("")}</div></section>`:""}
-    <section class="panel"><header><h2>Últimos recibos</h2><button class="btn small ghost" data-act="nav" data-id="pagos">Ver todos</button></header>
-    ${S.pagos.length?`<div class="list">${S.pagos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).slice(0,5).map(p=>`<div class="li"><div><div class="t1">${esc(nro(p.numero))} · ${esc(p.arrendatario)}${exTag(p)}</div><div class="sub">${esc(fperiod(p.periodo))} · pagado ${fdate(p.fecha)}</div></div><div class="toolbar"><span class="mono">${clp(p.monto)}</span><button class="btn small" data-act="rec-ver" data-id="${p.id}">Ver</button></div></div>`).join("")}</div>`:emptyBox("Aún no hay recibos","Cada pago registrado genera su recibo numerado.")}
+    <section class="panel"><header><h2>Actividad reciente</h2><button class="btn small ghost" data-act="nav" data-id="pagos">Pagos ${ico("chevron")}</button></header>
+    ${act.length?`<ul class="timeline">${act.map(a=>`<li><span class="tl-dot ${a.dir}">${ico(a.dir==="in"?"inflow":"outflow")}</span><div style="flex:1;min-width:0"><div class="t1">${esc(a.t)}</div><div class="sub">${fdate(a.f)} · ${esc(a.s)}</div></div><button class="btn small ghost mono" data-act="${a.act}" data-id="${a.id}" style="align-self:center">${a.dir==="in"?"+":"−"}${esc(a.m)}</button></li>`).join("")}</ul>`:emptyBox("Aún no hay actividad","Los pagos, gastos y contribuciones pagadas aparecerán aquí.","","pagos")}
     </section>
   </div>`;
 }
@@ -75,10 +74,15 @@ function vContribuciones(){
   const anios=[...new Set(S.contribuciones.map(q=>String(q.anio)).concat([String(new Date().getFullYear())]))].sort().reverse();
   const rows=fil(S.contribuciones).filter(q=>!F.anio||String(q.anio)===F.anio).sort((a,b)=>(a.vencimiento||"").localeCompare(b.vencimiento||"")||propName(a.propiedadId).localeCompare(propName(b.propiedadId)));
   const tot=rows.reduce((s,q)=>s+(Number(q.monto)||0),0), pag=rows.filter(q=>q.pagada).reduce((s,q)=>s+(Number(q.monto)||0),0);
+  const base=fil(S.contribuciones).filter(q=>!q.pagada&&q.vencimiento),atras=base.filter(q=>daysTo(q.vencimiento)<0),prox=base.filter(q=>daysTo(q.vencimiento)>=0&&daysTo(q.vencimiento)<=30);
+  const hist=[...new Set(fil(S.contribuciones).map(q=>String(q.anio)))].sort().reverse().map(a=>{const r=fil(S.contribuciones).filter(q=>String(q.anio)===a),t=sum(r,"monto"),p=sum(r.filter(q=>q.pagada),"monto");return [a,t,p,t-p,r.filter(q=>q.pagada).length+" / "+r.length]});
   return head("Contribuciones","Impuesto territorial en 4 cuotas: abril, junio, septiembre y noviembre.",`${propFilter()}<select class="f" id="fAnio" aria-label="Año">${anios.map(a=>`<option${F.anio===a?" selected":""}>${a}</option>`).join("")}</select><button class="btn" data-act="con-new">Agregar cuota</button><button class="btn primary" data-act="con-gen">Generar cuotas del año</button>`)+
+  (atras.length?`<div class="banner bad"><b>${atras.length} cuota${atras.length>1?"s":""} vencida${atras.length>1?"s":""}</b> por ${clp(sum(atras,"monto"))}. La más antigua venció el ${fdate(atras.map(q=>q.vencimiento).sort()[0])}.</div>`:"")+
+  (prox.length?`<div class="banner">${prox.length} cuota${prox.length>1?"s":""} vence${prox.length>1?"n":""} en los próximos 30 días (${clp(sum(prox,"monto"))}).</div>`:"")+
   `<div class="kpis"><div class="kpi"><span class="l">Total ${esc(F.anio)}</span><span class="v">${clp(tot)}</span></div><div class="kpi"><span class="l">Pagado</span><span class="v">${clp(pag)}</span><div class="bar"><i style="width:${tot?Math.round(pag/tot*100):0}%"></i></div></div><div class="kpi"><span class="l">Por pagar</span><span class="v">${clp(tot-pag)}</span></div></div>
-  <section class="panel">${rows.length?`<div class="tw"><table><thead><tr><th>Propiedad</th><th>Cuota</th><th>Vencimiento</th><th class="num">Monto</th><th>Estado</th><th>Pago</th><th></th></tr></thead><tbody>${rows.map(q=>{const e=estadoCuota(q),p=byId("propiedades",q.propiedadId);return `<tr><td><div class="t1">${esc(propName(q.propiedadId))}${exTag(q)}</div><div class="sub mono">Rol ${esc(p&&p.rol||"—")}</div></td><td>${esc(q.cuota)}ª / ${esc(q.anio)}</td><td>${fdate(q.vencimiento)}</td><td class="num">${clp(q.monto)}</td><td><span class="pill ${e.c}">${e.t}</span></td><td class="sub">${q.pagada?fdate(q.fechaPago)+(q.folio?" · "+esc(q.folio):""):"—"}</td><td class="act"><button class="btn small" data-act="con-pay" data-id="${q.id}">${q.pagada?"Desmarcar":"Marcar pagada"}</button><button class="btn small ghost" data-act="con-edit" data-id="${q.id}">Editar</button><button class="btn small ghost danger" data-act="con-del" data-id="${q.id}">Eliminar</button></td></tr>`}).join("")}</tbody></table></div>`:emptyBox("Sin cuotas para "+esc(F.anio),"Genera las 4 cuotas de una propiedad a partir del monto anual que informa el SII.",S.propiedades.length?`<button class="btn primary" data-act="con-gen">Generar cuotas</button>`:"")}</section>`;
+  <section class="panel">${rows.length?`<div class="tw"><table><thead><tr><th>Propiedad</th><th>Cuota</th><th>Vencimiento</th><th class="num">Monto</th><th>Estado</th><th>Pago</th><th></th></tr></thead><tbody>${rows.map(q=>{const e=estadoCuota(q),p=byId("propiedades",q.propiedadId);return `<tr><td><div class="t1">${esc(propName(q.propiedadId))}${exTag(q)}</div><div class="sub mono">Rol ${esc(p&&p.rol||"—")}</div></td><td>${esc(q.cuota)}ª / ${esc(q.anio)}</td><td>${fdate(q.vencimiento)}</td><td class="num">${clp(q.monto)}</td><td><span class="pill ${e.c}">${e.t}</span></td><td class="sub">${q.pagada?fdate(q.fechaPago)+(q.folio?" · "+esc(q.folio):""):"—"}${q.archivoId?`<div>${fileLink(q)}</div>`:""}</td><td class="act"><button class="btn small" data-act="con-pay" data-id="${q.id}">${q.pagada?"Desmarcar":"Marcar pagada"}</button><button class="btn small ghost" data-act="con-edit" data-id="${q.id}">Editar</button><button class="btn small ghost danger" data-act="con-del" data-id="${q.id}">Eliminar</button></td></tr>`}).join("")}</tbody></table></div>`:emptyBox("Sin cuotas para "+esc(F.anio),"Genera las 4 cuotas de una propiedad a partir del monto anual que informa el SII.",S.propiedades.length?`<button class="btn primary" data-act="con-gen">Generar cuotas</button>`:"")}</section>`+(hist.length>1?`<section class="panel"><header><h2>Historial anual</h2></header><div class="tw"><table><thead><tr><th>Año</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Por pagar</th><th>Cuotas pagadas</th></tr></thead><tbody>${hist.map(h=>`<tr><td class="t1">${h[0]}</td><td class="num">${clp(h[1])}</td><td class="num">${clp(h[2])}</td><td class="num">${h[3]>0?`<span class="neg">${clp(h[3])}</span>`:clp(h[3])}</td><td>${h[4]}</td></tr>`).join("")}</tbody></table></div></section>`:"");
 }
+
 function vDocumentos(){
   const rows=fil(S.documentos).sort((a,b)=>propName(a.propiedadId).localeCompare(propName(b.propiedadId))||(b.fecha||"").localeCompare(a.fecha||""));
   return head("Escrituras y documentos","Copia digital de escrituras, inscripciones y certificados, con sus datos de notaría y CBR.",`${propFilter()}<button class="btn primary" data-act="doc-new">Ingresar documento</button>`)+
@@ -86,8 +90,11 @@ function vDocumentos(){
 }
 function vContratos(){
   const rows=fil(S.contratos).sort((a,b)=>estadoContrato(b).vig-estadoContrato(a).vig||(b.inicio||"").localeCompare(a.inicio||""));
-  return head("Contratos de arriendo","Arrendatario, plazo, renta, reajuste y garantía de cada contrato.",`${propFilter()}<button class="btn primary" data-act="ctr-new">Nuevo contrato</button>`)+
-  `<section class="panel">${rows.length?`<div class="tw"><table><thead><tr><th>Arrendatario</th><th>Propiedad</th><th>Plazo</th><th class="num">Renta</th><th>Reajuste</th><th>Estado</th><th>Contrato</th><th></th></tr></thead><tbody>${rows.map(k=>{const e=estadoContrato(k);return `<tr><td><div class="t1">${esc(k.arrendatario)}${exTag(k)}</div><div class="sub">${esc([k.rut,k.telefono].filter(Boolean).join(" · "))}</div></td><td>${esc(propName(k.propiedadId))}</td><td class="sub">${fdate(k.inicio)}<br>${k.termino?fdate(k.termino):"indefinido"}</td><td class="num">${money(k.canon,k.moneda)}<div class="sub">día ${esc(k.diaPago||5)}</div></td><td class="sub">${esc(k.reajuste||"—")}${k.garantia?`<div>Garantía ${clp(k.garantia)}</div>`:""}</td><td><span class="pill ${e.c}">${e.t}</span></td><td>${fileLink(k)}</td><td class="act">${e.vig?`<button class="btn small" data-act="pay-new" data-id="${k.id}">Registrar pago</button>`:""}<button class="btn small ghost" data-act="ctr-edit" data-id="${k.id}">Editar</button><button class="btn small ghost danger" data-act="ctr-del" data-id="${k.id}">Eliminar</button></td></tr>`}).join("")}</tbody></table></div>`:emptyBox("Sin contratos","Registra el contrato y adjunta la copia firmada.",S.propiedades.length?`<button class="btn primary" data-act="ctr-new">Nuevo contrato</button>`:"")}</section>`;
+  const venc=S.contratos.filter(k=>estadoContrato(k).vig&&k.termino&&daysTo(k.termino)<=60&&!S.contratos.some(x=>x.renuevaDe===k.id)),reaj=S.contratos.filter(k=>estadoContrato(k).vig&&k.proxReajuste&&daysTo(k.proxReajuste)>=0&&daysTo(k.proxReajuste)<=30);
+  return head("Contratos de arriendo","Arrendatario, plazo, renta, reajuste y garantía de cada contrato.",`${propFilter()}<button class="btn primary" data-act="ctr-new">${ico("plus")}Nuevo contrato</button>`)+
+  (venc.length?`<div class="banner">${ico("alert").replace("<svg","<svg style=\"width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:-3px;margin-right:6px\"")}${venc.length===1?"1 contrato vence":venc.length+" contratos vencen"} en los próximos 60 días: ${venc.map(k=>`<b>${esc(k.arrendatario)}</b> (${fdate(k.termino)})`).join(", ")}.</div>`:"")+
+  (reaj.length?`<div class="banner info">Reajuste próximo: ${reaj.map(k=>`<b>${esc(k.arrendatario)}</b> el ${fdate(k.proxReajuste)}`).join(", ")}.</div>`:"")+
+  `<section class="panel">${rows.length?`<div class="tw"><table><thead><tr><th>Arrendatario</th><th>Propiedad</th><th>Plazo</th><th class="num">Renta</th><th>Reajuste</th><th>Estado</th><th>Contrato</th><th></th></tr></thead><tbody>${rows.map(k=>{const e=estadoContrato(k);return `<tr><td><div class="t1">${esc(k.arrendatario)}${exTag(k)}</div><div class="sub">${esc([k.rut,k.telefono].filter(Boolean).join(" · "))}</div></td><td>${esc(propName(k.propiedadId))}</td><td class="sub">${fdate(k.inicio)}<br>${k.termino?fdate(k.termino):"indefinido"}</td><td class="num">${money(k.canon,k.moneda)}<div class="sub">día ${esc(k.diaPago||5)}</div></td><td class="sub">${esc(k.reajuste||"—")}${k.proxReajuste?`<div>Próx. ${fdate(k.proxReajuste)}${daysTo(k.proxReajuste)<=30&&daysTo(k.proxReajuste)>=0?' <span class="pill warn mini">'+daysTo(k.proxReajuste)+' d</span>':""}</div>`:""}${k.garantia?`<div>Garantía ${clp(k.garantia)}</div>`:""}${k.renuevaDe?`<div>Renovación</div>`:""}</td><td><span class="pill ${e.c}">${e.t}</span></td><td>${fileLink(k)}</td><td class="act">${e.vig?`<button class="btn small" data-act="pay-new" data-id="${k.id}">Registrar pago</button>`:""}${k.termino&&(!e.vig||daysTo(k.termino)<=60)&&!S.contratos.some(x=>x.renuevaDe===k.id)?`<button class="btn small" data-act="ctr-renew" data-id="${k.id}">Renovar</button>`:""}<button class="btn small ghost" data-act="ctr-edit" data-id="${k.id}">Editar</button><button class="btn small ghost danger" data-act="ctr-del" data-id="${k.id}">Eliminar</button></td></tr>`}).join("")}</tbody></table></div>`:emptyBox("Sin contratos","Registra el contrato y adjunta la copia firmada.",S.propiedades.length?`<button class="btn primary" data-act="ctr-new">Nuevo contrato</button>`:"")}</section>`;
 }
 function vPagos(){
   const rows=fil(S.pagos).sort((a,b)=>(b.numero||0)-(a.numero||0));
@@ -274,7 +281,7 @@ function chartSVG(data){
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ingresos y egresos por mes">`;
   for(let i=0;i<=4;i++){const v=max*i/4,yy=yv(v);s+=`<line x1="${L}" x2="${W-8}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="var(--muted)">$${fmt(v)}</text>`}
   data.forEach((d,i)=>{const x=L+i*gw+gw*.18,bw=gw*.3;
-    s+=`<rect x="${x}" y="${yv(d.I)}" width="${bw}" height="${Math.max(0,T+ph-yv(d.I))}" rx="2" fill="var(--c-in)"><title>${d.m}: ingresos ${clp(d.I)}</title></rect><rect x="${x+bw+2}" y="${yv(d.E)}" width="${bw}" height="${Math.max(0,T+ph-yv(d.E))}" rx="2" fill="var(--c-out)"><title>${d.m}: egresos ${clp(d.E)}</title></rect><text x="${L+i*gw+gw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)">${d.m}</text>`});
+    s+=`<rect class="bar-r" x="${x}" y="${yv(d.I)}" width="${bw}" height="${Math.max(0,T+ph-yv(d.I))}" rx="2" fill="var(--c-in)"><title>${d.m}: ingresos ${clp(d.I)}</title></rect><rect class="bar-r" x="${x+bw+2}" y="${yv(d.E)}" width="${bw}" height="${Math.max(0,T+ph-yv(d.E))}" rx="2" fill="var(--c-out)"><title>${d.m}: egresos ${clp(d.E)}</title></rect><text x="${L+i*gw+gw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)">${d.m}</text>`});
   return s+`</svg><div class="legend"><span><i style="background:var(--c-in)"></i>Ingresos</span><span><i style="background:var(--c-out)"></i>Egresos</span></div>`;
 }
 const PILLS={Impago:"bad",Pagado:"ok"};
@@ -334,11 +341,13 @@ function vInformes(){
 function render(){
   nav();
   const m=$("#main");
+  document.body.classList.toggle("logged-out",dbState==="login");
   if(dbState==="login"){m.innerHTML=loginHTML();return}
-  if(dbState!=="none"&&!COLS.every(c=>S.loaded[c])){m.innerHTML=`<div class="empty"><b>Cargando la cartera…</b></div>`;return}
+  if(dbState!=="none"&&!COLS.every(c=>S.loaded[c])){m.innerHTML=`<div class="sk-row"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div><div class="sk sk-panel"></div>`;return}
   const fn={resumen:vResumen,propiedades:vPropiedades,contribuciones:vContribuciones,documentos:vDocumentos,contratos:vContratos,pagos:vPagos,gastos:vGastos,informes:vInformes,ajustes:vAjustes}[view]||vResumen;
   const fq=document.activeElement&&document.activeElement.id==="fQ";
   m.innerHTML=(dbState==="none"?`<div class="banner">No hay conexión con Firebase. Revisa FIREBASE_CONFIG en index.html y recarga la página.</div>`:"")+fn();
   if(fq){const i=$("#fQ");i.focus();i.setSelectionRange(i.value.length,i.value.length)}
+  enhanceTables();renderUser();
 }
 

@@ -5,7 +5,8 @@ document.addEventListener("click",async ev=>{
   if(a==="scrim"){if(ev.target===t)closeModal();return}
   try{
   switch(a){
-    case "nav":closeModal();view=id;try{history.replaceState(null,"","#"+id)}catch(_){}render();window.scrollTo(0,0);break;
+    case "nav":closeModal();view=id;try{history.replaceState(null,"","#"+id)}catch(_){}render();window.scrollTo(0,0);{const m=$("#main");m.style.animation="none";void m.offsetWidth;m.style.animation=""}break;
+    case "logout":if(window.firebase)await firebase.auth().signOut();break;
     case "close":closeModal();break;
     case "save":if(modalSave)await modalSave();break;
     case "prop-new":formPropiedad();break;
@@ -22,6 +23,7 @@ document.addEventListener("click",async ev=>{
     case "doc-del":confirmar("¿Eliminar este documento? El archivo adjunto dejará de estar enlazado.",()=>borrar("documentos",id));break;
     case "ctr-new":if(!S.propiedades.length){toast("Primero agrega una propiedad");break}closeModal();formContrato(null,id);break;
     case "ctr-edit":formContrato(byId("contratos",id));break;
+    case "ctr-renew":formContrato(null,null,byId("contratos",id));break;
     case "ctr-del":confirmar("¿Eliminar este contrato? Los pagos registrados se conservan.",()=>borrar("contratos",id));break;
     case "pay-new":closeModal();formPago(null,id?{contratoId:id}:{});break;
     case "pay-edit":formPago(byId("pagos",id));break;
@@ -47,7 +49,7 @@ document.addEventListener("click",async ev=>{
       t.disabled=false;break}
     case "emisor-save":{const fd=new FormData($("#emForm"));const o={};fd.forEach((v,k)=>o[k]=String(v).trim());if(!db)throw new Error("Sin conexión");await db.doc("config/emisor").set(o);toast("Datos del emisor guardados");break}
     case "demo-clear":confirmar("¿Borrar todos los registros marcados como ejemplo?",async()=>{for(const c of COLS)for(const x of S[c].filter(x=>x.ejemplo))await borrar(c,x.id)});break;
-  }}catch(e){toast(e.message||"Ocurrió un error")}
+  }}catch(e){toast(e.message||"Ocurrió un error","err")}
 });
 document.addEventListener("change",ev=>{
   if(ev.target.id==="fProp"){F.prop=ev.target.value;render()}
@@ -65,7 +67,7 @@ window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(VIEW
 
 /* ---------- arranque ---------- */
 render();
-function loginHTML(){return `<div class="panel" style="max-width:380px;margin:60px auto;padding:24px;gap:12px"><h2 style="font-family:var(--f-display);margin:0">Ingresar</h2><form id="loginForm" class="grid" style="grid-template-columns:1fr"><div class="fld"><label for="lgE">Correo</label><input id="lgE" type="email" autocomplete="username" required></div><div class="fld"><label for="lgP">Contraseña</label><input id="lgP" type="password" autocomplete="current-password" required></div><div class="err" id="lgErr" hidden></div><button class="btn primary" type="submit">Entrar</button></form></div>`}
+function loginHTML(){return `<div class="login"><div class="login-card"><img src="assets/logo.png" alt="Familia Benavides" width="88" height="88"><b class="lg-b">FAMILIA</b><strong class="lg-s">BENAVIDES</strong><span class="lg-t">Control de propiedades</span><form id="loginForm" class="lg-form"><div class="fld"><label for="lgE">Correo</label><input id="lgE" type="email" autocomplete="username" required></div><div class="fld"><label for="lgP">Contraseña</label><input id="lgP" type="password" autocomplete="current-password" required></div><div class="err" id="lgErr" hidden></div><button class="btn primary" type="submit" style="min-height:44px">Entrar</button></form></div></div>`}
 document.addEventListener("submit",async ev=>{
   if(ev.target.id!=="loginForm")return; ev.preventDefault();
   const err=$("#lgErr");
