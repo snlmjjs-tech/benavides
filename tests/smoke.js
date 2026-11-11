@@ -1,0 +1,47 @@
+const {open}=require("./harness"),fs=require("fs"),path=require("path");
+const seed=fs.readFileSync(path.join(__dirname,"seed.js"),"utf8");
+let fails=0;const ok=(c,m)=>{console.log((c?"  ✓ ":"  ✗ ")+m);if(!c)fails++};
+(async()=>{
+  const t=await open({seed});const {page}=t;
+  await page.waitForSelector(".kpis");
+  const txt=async()=>page.evaluate(()=>document.querySelector("#main").innerText);
+  const views=["resumen","propiedades","contribuciones","documentos","contratos","pagos","gastos","informes","ajustes"];
+  console.log("Carga de vistas");
+  for(const v of views){await page.evaluate(v=>{location.hash=v},v);await page.waitForTimeout(80);const s=await txt();ok(s.length>40&&!/undefined|NaN|\[object/.test(s),v)}
+  await page.evaluate(()=>{location.hash="resumen"});
+  ok(/Juan Pérez/.test(await txt()),"resumen muestra arrendatario");
+  console.log("Navegación y modal propiedad");
+  await page.click('[data-act="nav"][data-id="propiedades"]');await page.click('tr[data-act="prop-ver"]');
+  ok(await page.isVisible(".modal"),"abre ficha de propiedad");await page.click('[data-act="close"]');
+  console.log("Crear propiedad (persistencia)");
+  await page.click('[data-act="prop-new"]');
+  await page.fill("#f_nombre","Depto Nuevo");await page.fill("#f_direccion","Calle 9");await page.fill("#f_comuna","Rancagua");
+  await page.click("#saveBtn");await page.waitForTimeout(200);
+  ok(await page.evaluate(()=>Object.values(window.__store.propiedades).some(p=>p.nombre==="Depto Nuevo")),"propiedad guardada en Firestore simulado");
+  ok(await page.evaluate(()=>window.__writes.filter(w=>w[1]==="propiedades").length)===1,"sin duplicados (1 escritura)");
+  console.log("Registrar pago y recibo");
+  await page.click('[data-act="nav"][data-id="pagos"]');await page.click('[data-act="pay-new"]');
+  await page.selectOption("#f_contratoId","k2");await page.fill("#f_monto","500000");
+  const per=await page.inputValue("#f_periodo");await page.click("#saveBtn");await page.waitForTimeout(300);
+  ok(await page.evaluate(()=>Object.values(window.__store.pagos).some(p=>p.numero===2&&p.monto===500000)),"pago con número correlativo 2");
+  ok(await page.isVisible(".recibo"),"muestra recibo");
+  const [dl]=await Promise.all([page.waitForEvent("download"),page.click('[data-act="rec-pdf"]')]);
+  const f=await dl.path();ok(fs.readFileSync(f).slice(0,4).toString()==="%PDF","recibo PDF válido");
+  await page.click('[data-act="close"]');
+  console.log("Gastos: total = suma de ítems");
+  await page.click('[data-act="nav"][data-id="gastos"]');await page.click('[data-act="gas-new"]');
+  await page.selectOption("#g_prop","p1");await page.fill("#g_desc","Prueba");
+  const r=await page.$$("#itBody tr");await (await r[0].$(".it-unit")).fill("1000");await (await r[0].$(".it-cant")).fill("3");await (await r[1].$(".it-unit")).fill("2500");
+  ok((await page.textContent("#itTot")).replace(/\D/g,"")==="5500","total del gasto $5.500");
+  await page.click("#saveBtn");await page.waitForTimeout(250);
+  ok(await page.evaluate(()=>Object.values(window.__store.gastos).some(g=>g.descripcion==="Prueba"&&g.monto===5500)),"gasto guardado con monto 5500");
+  console.log("Informes PDF/CSV");
+  await page.click('[data-act="nav"][data-id="informes"]');
+  for(const a of["rep-pdf","rep-csv"]){const [d]=await Promise.all([page.waitForEvent("download"),page.click(`[data-act="${a}"]`)]);ok((await d.suggestedFilename()).length>3,a+" → "+d.suggestedFilename())}
+  console.log("Eliminar con confirmación");
+  await page.click('[data-act="nav"][data-id="gastos"]');await page.click('tr[data-act="gas-ver"]');await page.click('[data-act="gas-del"]');
+  ok(/Eliminar|¿Eliminar/.test(await page.textContent(".modal")),"pide confirmación");
+  await page.click("#saveBtn");await page.waitForTimeout(200);
+  console.log("Errores de consola:",t.errors.length?t.errors:"ninguno");ok(t.errors.length===0,"sin errores de consola");
+  await t.close();console.log(fails?"\nFALLAS: "+fails:"\nTODO OK");process.exit(fails?1:0);
+})().catch(e=>{console.error(e);process.exit(2)});
